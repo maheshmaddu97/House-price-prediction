@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>House price estimator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --paper: #eef1ec;
+    --card: #fbfcfa;
+    --ink: #17252f;
+    --muted: #5d6b73;
+    --line: #cfd7d0;
+    --teal: #0f6b6b;
+    --teal-dark: #0a4d4d;
+    --signal: #e0a526;
+    --error: #b3261e;
+    --font: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper: #11191d;
+      --card: #182228;
+      --ink: #e8eeea;
+      --muted: #94a3a8;
+      --line: #2c3a41;
+      --teal: #4fc0b8;
+      --teal-dark: #7bd6cf;
+      --signal: #f0bb48;
+      --error: #ff8a80;
+    }
+  }
+  * { box-sizing: border-box; }
+  html { background: var(--paper); }
+  body {
+    margin: 0; font-family: var(--font); color: var(--ink);
+    background: var(--paper); line-height: 1.5;
+  }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 48px 24px 72px; }
+  h1 {
+    font-size: clamp(2rem, 5vw, 3.2rem); font-weight: 800; letter-spacing: -0.03em;
+    line-height: 1.05; margin: 0 0 8px; max-width: 14ch;
+  }
+  .lede { color: var(--muted); margin: 0 0 40px; max-width: 52ch; }
+
+  .layout { display: grid; grid-template-columns: 1fr 340px; gap: 32px; align-items: start; }
+  @media (max-width: 860px) { .layout { grid-template-columns: 1fr; } }
+
+  fieldset {
+    border: 0; border-left: 3px solid var(--teal); margin: 0 0 28px;
+    padding: 2px 0 2px 20px;
+  }
+  legend { font-weight: 600; font-size: 1.1rem; padding: 0; margin-bottom: 14px; float: left; width: 100%; }
+  legend + * { clear: both; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 14px 16px; }
+
+  label { display: flex; flex-direction: column; gap: 5px; font-size: 0.9rem; color: var(--muted); }
+  input, select {
+    font: inherit; color: var(--ink); background: var(--card);
+    border: 1px solid var(--line); border-radius: 6px; padding: 10px 12px; width: 100%;
+  }
+  input:focus-visible, select:focus-visible, button:focus-visible {
+    outline: 3px solid var(--signal); outline-offset: 1px;
+  }
+  input[aria-invalid="true"] { border-color: var(--error); }
+  .hint { font-size: 0.78rem; color: var(--muted); }
+
+  .result {
+    position: sticky; top: 24px; background: var(--teal-dark); color: #f4f8f6;
+    border-radius: 14px; padding: 28px 24px; overflow: hidden;
+  }
+  @media (prefers-color-scheme: dark) { .result { background: #0d2f33; } }
+  .result h2 { font-size: 1rem; font-weight: 600; margin: 0 0 6px; opacity: .85; }
+  .price {
+    font-size: clamp(2.2rem, 6vw, 3rem); font-weight: 800; letter-spacing: -0.03em;
+    line-height: 1.05; margin: 0 0 4px; font-variant-numeric: tabular-nums;
+    min-height: 1.1em; word-break: break-word;
+  }
+  .price.empty { opacity: .45; }
+  .sub { margin: 0 0 22px; font-size: .88rem; opacity: .8; min-height: 1.3em; }
+  .roofline { display: block; width: 100%; height: 36px; margin: 0 0 18px; color: var(--signal); }
+  button {
+    font: inherit; font-weight: 600; width: 100%; padding: 13px 16px; cursor: pointer;
+    border: 0; border-radius: 8px; background: var(--signal); color: #1c1400;
+    transition: transform .12s ease, opacity .12s ease;
+  }
+  button:hover { transform: translateY(-1px); }
+  button:active { transform: translateY(0); }
+  button[disabled] { opacity: .6; cursor: progress; transform: none; }
+  .error { margin-top: 14px; font-size: .88rem; color: #ffd2cd; min-height: 1.2em; }
+  .reset {
+    margin-top: 10px; background: transparent; color: inherit; border: 1px solid rgba(255,255,255,.35);
+  }
+  .pop { animation: pop .35s ease; }
+  @keyframes pop { from { transform: scale(.97); opacity: .4; } to { transform: none; opacity: 1; } }
+  @media (prefers-reduced-motion: reduce) { .pop { animation: none; } button { transition: none; } }
+</style>
+</head>
+<body>
+<main class="wrap">
+  <h1>What is this house worth?</h1>
+  <p class="lede">Enter the property details and get an estimated sale price from a linear regression model trained on past sales.</p>
+
+  <div class="layout">
+    <form id="form" novalidate>
+      <fieldset>
+        <legend>Size and layout</legend>
+        <div class="grid">
+          <label>Bedrooms<input name="bedrooms" type="number" min="0" step="1" value="3" required></label>
+          <label>Bathrooms<input name="bathrooms" type="number" min="0" step="0.25" value="2" required></label>
+          <label>Floors<input name="floors" type="number" min="1" step="0.5" value="1" required></label>
+          <label>Living area (sq ft)<input name="sqft_living" type="number" min="0" value="1800" required></label>
+          <label>Above ground (sq ft)<input name="sqft_above" type="number" min="0" value="1500" required></label>
+          <label>Basement (sq ft)<input name="sqft_basement" type="number" min="0" value="300" required></label>
+          <label>Lot size (sq ft)<input name="sqft_lot" type="number" min="0" value="5000" required></label>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Age and condition</legend>
+        <div class="grid">
+          <label>Year built<input name="yr_built" type="number" min="1800" max="2100" value="1990" required></label>
+          <label>Year renovated
+            <input name="yr_renovated" type="number" min="0" max="2100" value="0">
+            <span class="hint">Use 0 if never renovated</span>
+          </label>
+          <label>Condition
+            <select name="condition">
+              <option value="1">1 – Poor</option><option value="2">2 – Fair</option>
+              <option value="3" selected>3 – Average</option><option value="4">4 – Good</option>
+              <option value="5">5 – Excellent</option>
+            </select>
+          </label>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Location and views</legend>
+        <div class="grid">
+          <label>City code
+            <input name="city" type="number" min="0" step="1" value="0" required>
+            <span class="hint">Number the model was trained with</span>
+          </label>
+          <label>Waterfront
+            <select name="waterfront"><option value="0" selected>No</option><option value="1">Yes</option></select>
+          </label>
+          <label>View quality
+            <select name="view">
+              <option value="0" selected>0 – None</option><option value="1">1</option>
+              <option value="2">2</option><option value="3">3</option><option value="4">4 – Best</option>
+            </select>
+          </label>
+        </div>
+      </fieldset>
+    </form>
+
+    <aside class="result" aria-live="polite">
+      <h2>Estimated price</h2>
+      <p class="price empty" id="price">–</p>
+      <p class="sub" id="sub">Fill in the form, then estimate.</p>
+      <svg class="roofline" viewBox="0 0 200 36" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round" aria-hidden="true">
+        <path d="M4 32 L4 18 L40 4 L76 18 L76 32 Z M76 32 L76 22 L120 8 L196 8 L196 32 Z"/>
+      </svg>
+      <button type="submit" form="form" id="go">Estimate price</button>
+      <button type="button" class="reset" id="reset">Reset form</button>
+      <div class="error" id="error" role="alert"></div>
+    </aside>
+  </div>
+</main>
+
+<script>
+  // When opened from disk (file://), talk to the local Flask server.
+  const API_BASE = location.protocol === "file:" ? "http://localhost:5000" : "";
+
+  const form = document.getElementById("form");
+  const priceEl = document.getElementById("price");
+  const subEl = document.getElementById("sub");
+  const errEl = document.getElementById("error");
+  const goBtn = document.getElementById("go");
+  const defaults = new FormData(form);
+
+  const money = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
+
+  function readForm() {
+    const out = {};
+    let ok = true;
+    for (const el of form.elements) {
+      if (!el.name) continue;
+      const bad = el.required && el.value.trim() === "";
+      el.setAttribute("aria-invalid", bad ? "true" : "false");
+      if (bad) ok = false;
+      out[el.name] = el.value === "" ? 0 : Number(el.value);
+    }
+    return ok ? out : null;
+  }
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    errEl.textContent = "";
+    const payload = readForm();
+    if (!payload) { errEl.textContent = "Fill in the highlighted fields."; return; }
+
+    goBtn.disabled = true; goBtn.textContent = "Estimating…";
+    try {
+      const res = await fetch(`${API_BASE}/api/predict`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Estimate failed.");
+
+      priceEl.textContent = money.format(data.price);
+      priceEl.classList.remove("empty");
+      priceEl.classList.remove("pop"); void priceEl.offsetWidth; priceEl.classList.add("pop");
+      subEl.textContent = data.raw < 0
+        ? "The model returned a negative value, so this is shown as $0. Check your inputs."
+        : `About ${money.format(data.price / Math.max(payload.sqft_living, 1))} per sq ft of living area.`;
+    } catch (err) {
+      errEl.textContent = err.message === "Failed to fetch"
+        ? "Can't reach the server. Start it with: python app.py"
+        : err.message;
+    } finally {
+      goBtn.disabled = false; goBtn.textContent = "Estimate price";
+    }
+  });
+
+  document.getElementById("reset").addEventListener("click", () => {
+    for (const [k, v] of defaults.entries()) form.elements[k].value = v;
+    for (const el of form.elements) el.removeAttribute("aria-invalid");
+    priceEl.textContent = "–"; priceEl.classList.add("empty");
+    subEl.textContent = "Fill in the form, then estimate.";
+    errEl.textContent = "";
+  });
+</script>
+</body>
+</html>
