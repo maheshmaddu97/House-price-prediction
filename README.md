@@ -129,10 +129,10 @@ cd House-price-prediction
 pip install pandas numpy matplotlib seaborn scikit-learn jupyter
 ```
 
-### Step 4: Launch Jupyter Notebook
+### Step 4: Launch PyCharm 
 
 ```bash
-jupyter notebook
+PyCharm
 ```
 
 Open the project notebook and execute the cells in sequence.
