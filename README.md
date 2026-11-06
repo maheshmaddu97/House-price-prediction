@@ -51,7 +51,7 @@ The goal is to predict the target variable using the remaining property features
 - **Matplotlib** — Data visualization
 - **Seaborn** — Statistical visualization
 - **Scikit-learn** — Data preprocessing, model training, and evaluation
-- **Jupyter Notebook / Google Colab** — Development environment
+- **PyCharm** — Development environment
 
 ## 🔄 Project Workflow
 
